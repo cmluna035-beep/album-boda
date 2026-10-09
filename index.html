@@ -203,7 +203,7 @@
 
   <script>
     const SUPABASE_URL = "https://gmdnbjkmayrjmvoxuwzb.supabase.co";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtZG5iamttYXlyam12b3h1d3piIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE1NjM1NjAsImV4cCI6MjEwNzEzOTU2MH0.peIkxVX2r7lCGrpeSB8IrVjIi7BUWxsjcf_T9fbWPME";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtZG5iamktZGVmYXVsdCIsImlhdCI6MTc5MTU2MzU2MCwiZXhwIjoyMTA3MTM5NTYwf0.peIkxVX2r7lCGrpeSB8IrVjIi7BUWxsjcf_T9fbWPME";
     
     const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     
@@ -283,7 +283,7 @@
     }
 
     window.abrirCamara = function(id) { 
-      retoSeleccionado = id; 
+      retoSeleccionado = id === 'null' ? null : id; 
       document.getElementById("cameraInput").click(); 
     };
 
@@ -291,28 +291,50 @@
       const originalFile = e.target.files[0];
       if (!originalFile) return;
 
-      const baseName = Date.now();
-      const feedBlob = await comprimirImagen(originalFile, 1000, 0.7);
-      
-      const { error: err1 } = await db.storage.from("fotos-feed").upload(`feed_${baseName}.jpg`, feedBlob, { contentType: "image/jpeg" });
-      if (err1) return alert("Error al subir. Revisa tu conexión a internet.");
+      mostrarToast("Procesando imagen...", 20);
 
-      const urlFeed = db.storage.from("fotos-feed").getPublicUrl(`feed_${baseName}.jpg`).data.publicUrl;
-      const { data: foto } = await db.from("fotos").insert({ 
-        reto_id: retoSeleccionado, 
-        autor: invitado, 
-        url_feed: urlFeed 
-      }).select().single();
+      try {
+        const baseName = 'img_' + Date.now();
+        const feedBlob = await comprimirImagen(originalFile, 1000, 0.7);
+        
+        mostrarToast("Subiendo al muro...", 50);
+        const { error: err1 } = await db.storage.from("fotos-feed").upload(`${baseName}.jpg`, feedBlob, { contentType: "image/jpeg" });
+        if (err1) {
+          alert("Error en Storage (Feed): " + err1.message);
+          document.getElementById("toastSync").classList.add("hidden");
+          return;
+        }
 
-      mostrarToast("Foto en el álbum. Guardando original...", 40);
-      
-      const { error: err2 } = await db.storage.from("fotos-originales").upload(`orig_${baseName}.jpg`, originalFile, { contentType: originalFile.type });
-      if (!err2) {
-        const urlOrig = db.storage.from("fotos-originales").getPublicUrl(`orig_${baseName}.jpg`).data.publicUrl;
-        await db.from("fotos").update({ url_original: urlOrig, estado_original: "completado" }).eq("id", foto.id);
-        document.getElementById("toastBar").style.width = "100%";
-        mostrarToast("¡Alta resolución guardada!", 100);
+        const urlFeed = db.storage.from("fotos-feed").getPublicUrl(`${baseName}.jpg`).data.publicUrl;
+        
+        const insertData = { 
+          autor: invitado, 
+          url_feed: urlFeed 
+        };
+        if (retoSeleccionado) insertData.reto_id = retoSeleccionado;
+
+        const { data: foto, error: errDb } = await db.from("fotos").insert(insertData).select().single();
+        if (errDb) {
+          alert("Error en Base de Datos: " + errDb.message);
+          document.getElementById("toastSync").classList.add("hidden");
+          return;
+        }
+
+        mostrarToast("Guardando original en alta resolución...", 80);
+        
+        const { error: err2 } = await db.storage.from("fotos-originales").upload(`${baseName}_orig.jpg`, originalFile, { contentType: originalFile.type });
+        if (!err2) {
+          const urlOrig = db.storage.from("fotos-originales").getPublicUrl(`${baseName}_orig.jpg`).data.publicUrl;
+          await db.from("fotos").update({ url_original: urlOrig, estado_original: "completado" }).eq("id", foto.id);
+        }
+
+        mostrarToast("¡Foto compartida con éxito!", 100);
         setTimeout(() => document.getElementById("toastSync").classList.add("hidden"), 3000);
+
+      } catch (err) {
+        console.error(err);
+        alert("Ocurrió un error inesperado al procesar la foto.");
+        document.getElementById("toastSync").classList.add("hidden");
       }
     });
 
