@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Álbum - Ericka & Omar</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen font-sans pb-16">
+
+  <header class="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm">
+    <div class="flex items-center gap-2">
+      <span class="text-2xl">💍</span>
+      <h1 class="text-lg font-bold text-slate-800 tracking-tight">Ericka & Omar</h1>
+    </div>
+    <div id="usuarioTag" class="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full border border-slate-200 hidden">
+      <span id="nombreMostrado" class="font-semibold text-slate-800"></span>
+    </div>
+  </header>
+
+  <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden">
+
+  <!-- Pantalla de Bienvenida -->
+  <section id="stepNombre" class="max-w-md mx-auto p-6 mt-12">
+    <div class="bg-white border border-slate-100 rounded-2xl p-8 text-center shadow-lg">
+      <div class="text-5xl mb-4">🥂</div>
+      <h2 class="text-2xl font-bold mb-2 text-slate-800">¡Bienvenidos!</h2>
+      <p class="text-sm text-slate-500 mb-8">Ayúdanos a capturar los mejores momentos. Sube tus fotos o completa los retos para armar nuestro álbum en vivo.</p>
+      
+      <div class="space-y-4">
+        <input type="text" id="nombreInput" placeholder="¿Cuál es tu nombre?" 
+          class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 text-center text-lg">
+        <button id="btnEmpezar" class="w-full py-3 bg-amber-500 hover:bg-amber-600 font-bold text-white rounded-xl transition shadow-md">
+          Entrar al Álbum
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pantalla Principal -->
+  <main id="mainApp" class="max-w-md mx-auto p-4 space-y-8 hidden">
+    
+    <section>
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-bold uppercase tracking-wider text-slate-500">Opciones de Cámara</h2>
+      </div>
+
+      <!-- NUEVO: BOTÓN DE FOTO LIBRE -->
+      <div class="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center justify-between gap-3 shadow-md mb-4">
+        <div class="flex items-center gap-3">
+          <span class="text-3xl">📸</span>
+          <div>
+            <p class="font-bold text-amber-900 text-sm">Foto Libre</p>
+            <p class="text-xs text-amber-700 mt-0.5">Captura cualquier momento especial sin reto.</p>
+          </div>
+        </div>
+        <button onclick="abrirCamara(null)" class="px-4 py-2 bg-amber-500 text-white hover:bg-amber-600 active:scale-95 text-xs font-bold rounded-lg transition whitespace-nowrap shadow-sm">
+          Capturar
+        </button>
+      </div>
+
+      <div class="flex items-center justify-between mb-4 mt-8">
+        <h2 class="text-sm font-bold uppercase tracking-wider text-slate-500">Misiones de hoy</h2>
+      </div>
+
+      <div id="listaRetos" class="grid gap-3"></div>
+    </section>
+
+    <section>
+      <h2 class="text-sm font-bold uppercase tracking-wider text-slate-500 mb-4">Álbum en vivo</h2>
+      <div id="feedFotos" class="grid grid-cols-2 gap-3"></div>
+    </section>
+  </main>
+
+  <!-- Notificación de subida -->
+  <div id="toastSync" class="fixed bottom-4 left-4 right-4 max-w-md mx-auto bg-slate-900 rounded-xl p-3 shadow-2xl flex items-center justify-between gap-3 text-xs hidden z-50">
+    <div class="flex items-center gap-2">
+      <div class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></div>
+      <span id="toastMsg" class="text-white font-medium">Subiendo foto en alta calidad...</span>
+    </div>
+    <div class="w-16 bg-slate-700 rounded-full h-1.5 overflow-hidden">
+      <div id="toastBar" class="bg-amber-500 h-full w-1/3 transition-all duration-300"></div>
+    </div>
+  </div>
+
+  <script>
+    // 👇 TU BASE DE DATOS YA ESTÁ CONECTADA AQUÍ 👇
+    const SUPABASE_URL = "https://gmdnbjkmayrjmvoxuwzb.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtZG5iamttYXlyam12b3h1d3piIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE1NjM1NjAsImV4cCI6MjEwNzEzOTU2MH0.peIkxVX2r7lCGrpeSB8IrVjIi7BUWxsjcf_T9fbWPME";
+    // 👆 ======================================================= 👆
+
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    let invitado = localStorage.getItem("invitado_nombre") || "";
+    let retoSeleccionado = null;
+
+    if (invitado) activarApp();
+
+    document.getElementById("btnEmpezar").addEventListener("click", () => {
+      const nombre = document.getElementById("nombreInput").value.trim();
+      if (!nombre) return alert("Por favor ingresa tu nombre");
+      invitado = nombre;
+      localStorage.setItem("invitado_nombre", invitado);
+      activarApp();
+    });
+
+    function activarApp() {
+      document.getElementById("stepNombre").classList.add("hidden");
+      document.getElementById("mainApp").classList.remove("hidden");
+      document.getElementById("usuarioTag").classList.remove("hidden");
+      document.getElementById("nombreMostrado").textContent = invitado;
+      cargarRetos();
+      cargarFeed();
+      escucharFotosEnVivo();
+    }
+
+    async function cargarRetos() {
+      const { data } = await db.from("retos").select("*");
+      document.getElementById("listaRetos").innerHTML = data.map(r => `
+        <div class="bg-white border border-slate-200 p-4 rounded-xl flex items-center justify-between gap-3 shadow-sm">
+          <div class="flex items-center gap-3">
+            <span class="text-3xl">${r.icono}</span>
+            <div>
+              <p class="font-bold text-slate-800 text-sm">${r.titulo}</p>
+              <p class="text-xs text-slate-500 mt-0.5">${r.descripcion}</p>
+            </div>
+          </div>
+          <button onclick="abrirCamara('${r.id}')" class="px-4 py-2 bg-amber-100 text-amber-700 hover:bg-amber-200 active:scale-95 text-xs font-bold rounded-lg transition whitespace-nowrap">
+            Capturar
+          </button>
+        </div>
+      `).join("");
+    }
+
+    async function cargarFeed() {
+      const { data } = await db.from("fotos").select("*, retos(titulo, icono)").order("created_at", { ascending: false });
+      document.getElementById("feedFotos").innerHTML = data.map(f => renderCard(f)).join("");
+    }
+
+    function renderCard(f) {
+      // Si la foto no tiene un reto asociado (f.retos es null), mostrará "📸 Foto Libre"
+      const etiquetaReto = f.retos ? f.retos.icono + ' ' + f.retos.titulo : '📸 Foto Libre';
+      
+      return `
+        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm flex flex-col">
+          <img src="${f.url_feed}" class="w-full aspect-square object-cover">
+          <div class="p-2.5 flex-1 flex flex-col justify-between">
+            <span class="text-[10px] text-amber-600 font-bold block truncate">${etiquetaReto}</span>
+            <span class="text-xs text-slate-500 font-medium truncate">Por ${f.autor}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function escucharFotosEnVivo() {
+      db.channel("cambios-feed")
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "fotos" }, async (payload) => {
+          const { data } = await db.from("fotos").select("*, retos(titulo, icono)").eq("id", payload.new.id).single();
+          if (data) document.getElementById("feedFotos").insertAdjacentHTML("afterbegin", renderCard(data));
+        }).subscribe();
+    }
+
+    // La función ahora soporta recibir "null" para indicar que es una foto libre
+    window.abrirCamara = function(id) { 
+      retoSeleccionado = id; 
+      document.getElementById("cameraInput").click(); 
+    };
+
+    document.getElementById("cameraInput").addEventListener("change", async (e) => {
+      const originalFile = e.target.files[0];
+      if (!originalFile) return;
+
+      const baseName = Date.now();
+      const feedBlob = await comprimirImagen(originalFile, 1000, 0.7);
+      
+      const { error: err1 } = await db.storage.from("fotos-feed").upload(`feed_${baseName}.jpg`, feedBlob, { contentType: "image/jpeg" });
+      if (err1) return alert("Error subiendo foto. Revisa tu conexión.");
+
+      const urlFeed = db.storage.from("fotos-feed").getPublicUrl(`feed_${baseName}.jpg`).data.publicUrl;
+      
+      // Si retoSeleccionado es null, Supabase lo guarda como vacío en la tabla
+      const { data: foto } = await db.from("fotos").insert({ 
+        reto_id: retoSeleccionado, 
+        autor: invitado, 
+        url_feed: urlFeed 
+      }).select().single();
+
+      mostrarToast("Foto en el álbum. Guardando original en alta resolución...", 40);
+      
+      const { error: err2 } = await db.storage.from("fotos-originales").upload(`orig_${baseName}.jpg`, originalFile, { contentType: originalFile.type });
+      if (!err2) {
+        const urlOrig = db.storage.from("fotos-originales").getPublicUrl(`orig_${baseName}.jpg`).data.publicUrl;
+        await db.from("fotos").update({ url_original: urlOrig, estado_original: "completado" }).eq("id", foto.id);
+        document.getElementById("toastBar").style.width = "100%";
+        mostrarToast("¡Alta resolución guardada!", 100);
+        setTimeout(() => document.getElementById("toastSync").classList.add("hidden"), 3000);
+      }
+    });
+
+    function mostrarToast(msg, w) {
+      document.getElementById("toastSync").classList.remove("hidden");
+      document.getElementById("toastMsg").textContent = msg;
+      document.getElementById("toastBar").style.width = w + "%";
+    }
+
+    function comprimirImagen(file, max, q) {
+      return new Promise(res => {
+        const reader = new FileReader();
+        reader.onload = e => {
+          const img = new Image();
+          img.onload = () => {
+            let [w, h] = [img.width, img.height];
+            if (w > h && w > max) { h *= max / w; w = max; } 
+            else if (h > max) { w *= max / h; h = max; }
+            const cvs = document.createElement("canvas");
+            cvs.width = w; cvs.height = h;
+            cvs.getContext("2d").drawImage(img, 0, 0, w, h);
+            cvs.toBlob(blob => res(blob), "image/jpeg", q);
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+  </script>
+</body>
+</html>
