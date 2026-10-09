@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Álbum en Vivo - Ericka & Omar</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -21,6 +21,7 @@
       width: 100%;
       max-width: 100%; 
       min-height: 100vh;
+      min-height: 100dvh;
       background-image: url('IMG_7667-Mejorado-NR.jpg'); 
       background-size: cover;
       background-position: center center;
@@ -62,30 +63,38 @@
 
     .decor-corner-top-right {
       position: absolute;
-      top: 0;
-      right: 0;
-      width: 150px;
-      height: 150px;
+      top: -15px;
+      right: -15px;
+      width: 180px;
+      height: 180px;
       pointer-events: none;
       z-index: 5;
-      opacity: 0.7;
+      opacity: 0.85;
     }
     
     .decor-corner-bottom-left {
       position: fixed;
-      bottom: 0;
-      left: 0;
-      width: 120px;
-      height: 120px;
+      bottom: 140px;
+      left: -35px;
+      width: 165px;
+      height: 190px;
       pointer-events: none;
       z-index: 5;
-      opacity: 0.6;
+      opacity: 0.65;
     }
 
     .scroll-content {
       position: relative;
       z-index: 20;
       padding-bottom: 80px; 
+    }
+
+    /* Estilo especial para modo Proyector */
+    body.projector-mode .phone-stage {
+      background-attachment: scroll;
+    }
+    body.projector-mode .hide-on-projector {
+      display: none !important;
     }
   </style>
 </head>
@@ -112,14 +121,22 @@
         <line x1="0" y1="110" x2="160" y2="240" stroke="#c5a059" stroke-width="1.5" stroke-opacity="0.8"/>
       </svg>
 
-      <!-- Encabezado -->
+      <!-- Encabezado con Botón de Proyección -->
       <header class="sticky top-0 z-30 bg-white/40 backdrop-blur-md border-b border-white/50 px-4 py-3 flex items-center justify-between">
         <div class="flex items-center gap-2">
           <span class="text-2xl">💍</span>
           <h1 class="text-lg font-bold text-slate-800 tracking-tight" style="font-family: 'Cormorant Garamond', serif;">Ericka & Omar</h1>
         </div>
-        <div id="usuarioTag" class="text-xs bg-white/70 text-slate-700 px-3 py-1.5 rounded-full border border-white/80 hidden font-medium shadow-sm">
-          <span id="nombreMostrado"></span>
+        
+        <div class="flex items-center gap-2">
+          <!-- BOTÓN DE MODO PROYECTOR -->
+          <button onclick="alternarProyeccion()" id="btnProyector" class="text-xs bg-boda-secondary text-white px-3 py-1.5 rounded-full font-bold shadow-sm hover:opacity-90 transition flex items-center gap-1 cursor-pointer">
+            <span>🖥️</span> <span id="txtProyector">Proyectar</span>
+          </button>
+          
+          <div id="usuarioTag" class="text-xs bg-white/70 text-slate-700 px-3 py-1.5 rounded-full border border-white/80 hidden font-medium shadow-sm">
+            <span id="nombreMostrado"></span>
+          </div>
         </div>
       </header>
 
@@ -127,7 +144,7 @@
         <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden">
 
         <!-- Pantalla de Nombre / Ingreso -->
-        <section id="stepNombre" class="max-w-md mx-auto p-6 mt-16 relative z-20">
+        <section id="stepNombre" class="max-w-md mx-auto p-6 mt-16 relative z-20 hide-on-projector">
           <div class="glass-card rounded-2xl p-8 text-center shadow-lg">
             <div class="text-5xl mb-4">📸</div>
             <h2 class="text-2xl font-bold mb-2 text-slate-800" style="font-family: 'Cormorant Garamond', serif;">Álbum en Vivo</h2>
@@ -147,7 +164,8 @@
         <main id="mainApp" class="max-w-7xl w-full mx-auto p-4 md:p-8 hidden relative z-20 mt-4">
           <div class="flex flex-col md:flex-row gap-8">
             
-            <div class="w-full md:w-1/3 lg:w-1/4">
+            <!-- Columna de Retos (Se oculta al proyectar para dejar todo el espacio a las fotos) -->
+            <div id="columnaRetos" class="w-full md:w-1/3 lg:w-1/4">
               <section>
                 <div class="glass-card border-boda bg-boda-tertiary p-4 rounded-xl flex items-center justify-between gap-3 mb-6 relative overflow-hidden">
                   <div class="absolute -right-4 -bottom-4 opacity-10 text-6xl">📸</div>
@@ -172,7 +190,8 @@
               </section>
             </div>
 
-            <div class="w-full md:w-2/3 lg:w-3/4">
+            <!-- Columna del Muro de Fotos (Se expande a pantalla completa en modo proyector) -->
+            <div id="columnaMuro" class="w-full md:w-2/3 lg:w-3/4 transition-all duration-300">
               <section>
                 <div class="flex items-center justify-between mb-4 mt-8 md:mt-0">
                   <h2 class="text-xs font-bold uppercase tracking-widest text-boda-primary">El Muro de Hoy</h2>
@@ -260,7 +279,7 @@
       const tituloReto = f.retos ? f.retos.titulo : 'Foto Libre';
       
       return `
-        <div class="glass-card rounded-xl overflow-hidden flex flex-col group relative">
+        <div class="glass-card rounded-xl overflow-hidden flex flex-col group relative shadow-md">
           <div class="w-full aspect-square overflow-hidden bg-slate-200">
             <img src="${f.url_feed}" class="w-full h-full object-cover transition duration-500 group-hover:scale-105" loading="lazy">
           </div>
@@ -308,7 +327,7 @@
         const urlFeed = db.storage.from("fotos-feed").getPublicUrl(`${baseName}.jpg`).data.publicUrl;
         
         const insertData = { 
-          autor: invitado, 
+          autor: invitado || "Invitado", 
           url_feed: urlFeed 
         };
         if (retoSeleccionado) insertData.reto_id = retoSeleccionado;
@@ -362,6 +381,33 @@
         };
         reader.readAsDataURL(file);
       });
+    }
+
+    /* Función para alternar el modo proyector en la pantalla grande */
+    let modoProyector = false;
+    function alternarProyeccion() {
+      modoProyector = !modoProyector;
+      const colRetos = document.getElementById("columnaRetos");
+      const colMuro = document.getElementById("columnaMuro");
+      const txtProyector = document.getElementById("txtProyector");
+      
+      if (modoProyector) {
+        document.body.classList.add("projector-mode");
+        colRetos.classList.add("hidden");
+        colMuro.className = "w-full"; // Ocupa el 100% de la pantalla para mostrar más fotos
+        txtProyector.textContent = "Salir";
+        // Si no ha ingresado nombre y da clic en proyectar, asignamos uno genérico para que abra el muro
+        if (!invitado) {
+          invitado = "Proyector";
+          document.getElementById("stepNombre").classList.add("hidden");
+          document.getElementById("mainApp").classList.remove("hidden");
+        }
+      } else {
+        document.body.classList.remove("projector-mode");
+        colRetos.classList.remove("hidden");
+        colMuro.className = "w-full md:w-2/3 lg:w-3/4";
+        txtProyector.textContent = "Proyectar";
+      }
     }
   </script>
 </body>
