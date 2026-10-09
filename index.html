@@ -203,7 +203,7 @@
 
   <script>
     const SUPABASE_URL = "https://gmdnbjkmayrjmvoxuwzb.supabase.co";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtZG5iamktZGVmYXVsdCIsImlhdCI6MTc5MTU2MzU2MCwiZXhwIjoyMTA3MTM5NTYwf0.peIkxVX2r7lCGrpeSB8IrVjIi7BUWxsjcf_T9fbWPME";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtZG5iamttYXlyam12b3h1d3piIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE1NjM1NjAsImV4cCI6MjEwNzEzOTU2MH0.peIkxVX2r7lCGrpeSB8IrVjIi7BUWxsjcf_T9fbWPME";
     
     const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     
@@ -283,7 +283,7 @@
     }
 
     window.abrirCamara = function(id) { 
-      retoSeleccionado = id === 'null' ? null : id; 
+      retoSeleccionado = (id === 'null' || id === null) ? null : id; 
       document.getElementById("cameraInput").click(); 
     };
 
