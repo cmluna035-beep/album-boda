@@ -183,4 +183,193 @@
                       <p class="text-xs text-slate-600 mt-0.5 font-medium">Sube cualquier momento.</p>
                     </div>
                   </div>
-                  <button onclick="abrirCamara(null)" class="px-4 py-2 bg-boda-secondary text-white hover:bg-opacity-90 active:scale-9
+                  <button onclick="abrirCamara(null)" class="px-4 py-2 bg-boda-secondary text-white hover:bg-opacity-90 active:scale-95 text-xs font-bold rounded-lg transition whitespace-nowrap shadow-sm relative z-10 uppercase tracking-wide">
+                    Capturar
+                  </button>
+                </div>
+
+                <div class="flex items-center justify-between mb-4 mt-6">
+                  <h2 class="text-xs font-bold uppercase tracking-widest text-boda-primary">Retos Fotográficos</h2>
+                  <div class="h-px bg-boda-primary/30 flex-1 ml-4"></div>
+                </div>
+
+                <div id="listaRetos" class="grid gap-3">
+                  <!-- Retos inyectados por JS -->
+                </div>
+              </section>
+            </div>
+
+            <!-- Columna Derecha: Muro de Fotos (2/3 en PC) -->
+            <div class="w-full md:w-2/3 lg:w-3/4">
+              <section>
+                <div class="flex items-center justify-between mb-4 mt-8 md:mt-0">
+                  <h2 class="text-xs font-bold uppercase tracking-widest text-boda-primary">El Muro de Hoy</h2>
+                  <div class="h-px bg-boda-primary/30 flex-1 ml-4"></div>
+                </div>
+                
+                <!-- Rejilla Responsive: 2 en móvil, 4 o 5 en PC -->
+                <div id="feedFotos" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
+                  <!-- Fotos inyectadas por JS -->
+                </div>
+              </section>
+            </div>
+            
+          </div>
+        </main>
+      </div> <!-- /scroll-content -->
+    </div> <!-- /glass-overlay -->
+
+    <!-- Notificación flotante inferior -->
+    <div id="toastSync" class="fixed bottom-6 left-4 right-4 max-w-md mx-auto bg-slate-900/95 backdrop-blur rounded-xl p-3 shadow-2xl flex items-center justify-between gap-3 text-xs hidden z-50 border border-[#c5a059]/30">
+      <div class="flex items-center gap-2">
+        <div class="w-2 h-2 rounded-full bg-[#c5a059] animate-ping"></div>
+        <span id="toastMsg" class="text-white font-medium tracking-wide">Subiendo foto...</span>
+      </div>
+      <div class="w-16 bg-slate-800 rounded-full h-1.5 overflow-hidden">
+        <div id="toastBar" class="bg-[#c5a059] h-full w-1/3 transition-all duration-300"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Conexión Directa a tu Base de Datos Supabase
+    const SUPABASE_URL = "https://gmdnbjkmayrjmvoxuwzb.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtZG5iamttYXlyam12b3h1d3piIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE1NjM1NjAsImV4cCI6MjEwNzEzOTU2MH0.peIkxVX2r7lCGrpeSB8IrVjIi7BUWxsjcf_T9fbWPME";
+    
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    
+    let invitado = localStorage.getItem("invitado_nombre") || "";
+    let retoSeleccionado = null;
+
+    if (invitado) activarApp();
+
+    document.getElementById("btnEmpezar").addEventListener("click", () => {
+      const nombre = document.getElementById("nombreInput").value.trim();
+      if (!nombre) return alert("Por favor ingresa tu nombre");
+      invitado = nombre;
+      localStorage.setItem("invitado_nombre", invitado);
+      activarApp();
+    });
+
+    function activarApp() {
+      document.getElementById("stepNombre").classList.add("hidden");
+      document.getElementById("mainApp").classList.remove("hidden");
+      document.getElementById("usuarioTag").classList.remove("hidden");
+      document.getElementById("nombreMostrado").textContent = invitado;
+      cargarRetos();
+      cargarFeed();
+      escucharFotosEnVivo();
+    }
+
+    async function cargarRetos() {
+      const { data } = await db.from("retos").select("*");
+      document.getElementById("listaRetos").innerHTML = data.map(r => `
+        <div class="glass-card p-4 rounded-xl flex items-center justify-between gap-3 relative overflow-hidden group hover:bg-white/80 transition duration-300">
+          <div class="flex items-center gap-3 relative z-10">
+            <span class="text-3xl filter drop-shadow-sm">${r.icono}</span>
+            <div>
+              <p class="font-bold text-slate-800 text-sm leading-tight">${r.titulo}</p>
+              <p class="text-xs text-slate-600 mt-0.5 font-medium leading-snug">${r.descripcion}</p>
+            </div>
+          </div>
+          <button onclick="abrirCamara('${r.id}')" class="px-3.5 py-1.5 bg-white text-boda-primary border border-boda hover:bg-boda-primary hover:text-white active:scale-95 text-xs font-bold rounded-lg transition whitespace-nowrap shadow-sm relative z-10 uppercase tracking-wide">
+            Cumplir
+          </button>
+        </div>
+      `).join("");
+    }
+
+    async function cargarFeed() {
+      const { data } = await db.from("fotos").select("*, retos(titulo, icono)").order("created_at", { ascending: false });
+      document.getElementById("feedFotos").innerHTML = data.map(f => renderCard(f)).join("");
+    }
+
+    function renderCard(f) {
+      const iconoReto = f.retos ? f.retos.icono : '✨';
+      const tituloReto = f.retos ? f.retos.titulo : 'Foto Libre';
+      
+      return `
+        <div class="glass-card rounded-xl overflow-hidden flex flex-col group relative">
+          <div class="w-full aspect-square overflow-hidden bg-slate-200">
+            <img src="${f.url_feed}" class="w-full h-full object-cover transition duration-500 group-hover:scale-105" loading="lazy">
+          </div>
+          <div class="p-2.5 flex-1 flex flex-col justify-between bg-white/60">
+            <span class="text-[10px] text-boda-primary font-bold block truncate uppercase tracking-wide">
+              ${iconoReto} ${tituloReto}
+            </span>
+            <span class="text-xs text-slate-600 font-medium truncate mt-1">📸 ${f.autor}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function escucharFotosEnVivo() {
+      db.channel("cambios-feed")
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "fotos" }, async (payload) => {
+          const { data } = await db.from("fotos").select("*, retos(titulo, icono)").eq("id", payload.new.id).single();
+          if (data) document.getElementById("feedFotos").insertAdjacentHTML("afterbegin", renderCard(data));
+        }).subscribe();
+    }
+
+    window.abrirCamara = function(id) { 
+      retoSeleccionado = id; 
+      document.getElementById("cameraInput").click(); 
+    };
+
+    document.getElementById("cameraInput").addEventListener("change", async (e) => {
+      const originalFile = e.target.files[0];
+      if (!originalFile) return;
+
+      const baseName = Date.now();
+      const feedBlob = await comprimirImagen(originalFile, 1000, 0.7);
+      
+      const { error: err1 } = await db.storage.from("fotos-feed").upload(`feed_${baseName}.jpg`, feedBlob, { contentType: "image/jpeg" });
+      if (err1) return alert("Error al subir. Revisa tu conexión a internet.");
+
+      const urlFeed = db.storage.from("fotos-feed").getPublicUrl(`feed_${baseName}.jpg`).data.publicUrl;
+      const { data: foto } = await db.from("fotos").insert({ 
+        reto_id: retoSeleccionado, 
+        autor: invitado, 
+        url_feed: urlFeed 
+      }).select().single();
+
+      mostrarToast("Foto en el álbum. Guardando original en alta resolución...", 40);
+      
+      const { error: err2 } = await db.storage.from("fotos-originales").upload(`orig_${baseName}.jpg`, originalFile, { contentType: originalFile.type });
+      if (!err2) {
+        const urlOrig = db.storage.from("fotos-originales").getPublicUrl(`orig_${baseName}.jpg`).data.publicUrl;
+        await db.from("fotos").update({ url_original: urlOrig, estado_original: "completado" }).eq("id", foto.id);
+        document.getElementById("toastBar").style.width = "100%";
+        mostrarToast("¡Alta resolución guardada con éxito!", 100);
+        setTimeout(() => document.getElementById("toastSync").classList.add("hidden"), 3000);
+      }
+    });
+
+    function mostrarToast(msg, w) {
+      document.getElementById("toastSync").classList.remove("hidden");
+      document.getElementById("toastMsg").textContent = msg;
+      document.getElementById("toastBar").style.width = w + "%";
+    }
+
+    function comprimirImagen(file, max, q) {
+      return new Promise(res => {
+        const reader = new FileReader();
+        reader.onload = e => {
+          const img = new Image();
+          img.onload = () => {
+            let [w, h] = [img.width, img.height];
+            if (w > h && w > max) { h *= max / w; w = max; } 
+            else if (h > max) { w *= max / h; h = max; }
+            const cvs = document.createElement("canvas");
+            cvs.width = w; cvs.height = h;
+            cvs.getContext("2d").drawImage(img, 0, 0, w, h);
+            cvs.toBlob(blob => res(blob), "image/jpeg", q);
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+  </script>
+</body>
+</html>
