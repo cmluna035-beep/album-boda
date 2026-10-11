@@ -97,7 +97,6 @@
       display: none !important;
     }
 
-    /* Pantalla Gigante de Diapositivas */
     #slideshowContainer {
       display: none;
       position: fixed;
@@ -156,10 +155,12 @@
       </header>
 
       <div class="scroll-content">
-        <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden">
+        <!-- Dos inputs separados: Uno para cámara directa y otro para galería -->
+        <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden" onchange="procesarInputFoto(event)">
+        <input type="file" id="galleryInput" accept="image/*" class="hidden" onchange="procesarInputFoto(event)">
 
         <!-- Pantalla de Nombre / Ingreso -->
-        <section id="stepNombre" class="max-w-md mx-auto p-6 mt-16 relative z-20">
+        <section id="stepNombre" class="max-w-md mx-auto p-6 mt-16 relative z-20 hide-on-projector">
           <div class="glass-card rounded-2xl p-8 text-center shadow-lg">
             <div class="text-5xl mb-4">📸</div>
             <h2 class="text-2xl font-bold mb-2 text-slate-800" style="font-family: 'Cormorant Garamond', serif;">Álbum en Vivo</h2>
@@ -190,8 +191,9 @@
                       <p class="text-xs text-slate-600 mt-0.5 font-medium">Sube cualquier momento.</p>
                     </div>
                   </div>
-                  <button onclick="abrirCamara(null)" class="px-4 py-2 bg-boda-secondary text-white hover:bg-opacity-90 active:scale-95 text-xs font-bold rounded-lg transition whitespace-nowrap shadow-sm relative z-10 uppercase tracking-wide cursor-pointer">
-                    Capturar
+                  <!-- Cambiamos la función a abrirModalFoto -->
+                  <button onclick="abrirModalFoto(null)" class="px-4 py-2 bg-boda-secondary text-white hover:bg-opacity-90 active:scale-95 text-xs font-bold rounded-lg transition whitespace-nowrap shadow-sm relative z-10 uppercase tracking-wide cursor-pointer">
+                    Subir Foto
                   </button>
                 </div>
 
@@ -221,7 +223,7 @@
 
     </div>
 
-    <!-- BARRA INFERIOR DE ESTADÍSTICAS / RANKING EN VIVO -->
+    <!-- BARRA INFERIOR DE ESTADÍSTICAS -->
     <div id="statsBar" class="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-[#c5a059]/30 py-2.5 px-4 z-40 flex items-center justify-between shadow-lg text-xs text-slate-700">
       <div class="flex items-center gap-2">
         <span>🏆</span>
@@ -249,8 +251,34 @@
       </div>
     </div>
 
+    <!-- MODAL DE SELECCIÓN DE ORIGEN DE FOTO -->
+    <div id="photoSourceModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] hidden flex-col items-center justify-end md:justify-center px-4 pb-8 md:pb-0 transition-opacity">
+      <div class="glass-card w-full max-w-sm rounded-3xl p-6 flex flex-col gap-4 transform translate-y-full transition-transform duration-300 shadow-2xl" id="photoSourceCard">
+        
+        <div class="text-center mb-2 relative">
+          <!-- Botón X para cerrar -->
+          <button onclick="cerrarModalFoto()" class="absolute -top-2 -right-2 text-slate-400 hover:text-slate-600 p-2">✕</button>
+          
+          <div class="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-4 md:hidden"></div>
+          <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+            <span class="text-2xl text-blue-500">🖼️</span>
+          </div>
+          <h3 class="text-xl font-bold text-slate-800" style="font-family: 'Montserrat', sans-serif;">Sube tu foto</h3>
+          <p class="text-xs text-slate-500 mt-1">Elige cómo quieres compartir este recuerdo con nosotros.</p>
+        </div>
+        
+        <button onclick="elegirFuente('camera')" class="w-full py-3.5 bg-boda-secondary text-white rounded-xl font-bold shadow-md flex items-center justify-center gap-2 active:scale-95 transition">
+          <span class="text-lg">📸</span> Tomar Foto Ahora
+        </button>
+        
+        <button onclick="elegirFuente('gallery')" class="w-full py-3.5 bg-white border-2 border-boda-secondary text-boda-secondary rounded-xl font-bold shadow-sm flex items-center justify-center gap-2 active:scale-95 transition">
+          <span class="text-lg">🖼️</span> Subir desde Galería
+        </button>
+      </div>
+    </div>
+
     <!-- Notificación flotante de subida -->
-    <div id="toastSync" class="fixed bottom-12 left-4 right-4 max-w-md mx-auto bg-slate-900/95 backdrop-blur rounded-xl p-3 shadow-2xl flex items-center justify-between gap-3 text-xs hidden z-50 border border-[#c5a059]/30">
+    <div id="toastSync" class="fixed bottom-14 left-4 right-4 max-w-md mx-auto bg-slate-900/95 backdrop-blur rounded-xl p-3 shadow-2xl flex items-center justify-between gap-3 text-xs hidden z-50 border border-[#c5a059]/30">
       <div class="flex items-center gap-2">
         <div class="w-2 h-2 rounded-full bg-[#c5a059] animate-ping"></div>
         <span id="toastMsg" class="text-white font-medium tracking-wide">Subiendo foto...</span>
@@ -305,8 +333,8 @@
               <p class="text-xs text-slate-600 mt-0.5 font-medium leading-snug">${r.descripcion}</p>
             </div>
           </div>
-          <button onclick="abrirCamara('${r.id}')" class="px-3.5 py-1.5 bg-white text-boda-primary border border-boda hover:bg-boda-primary hover:text-white active:scale-95 text-xs font-bold rounded-lg transition whitespace-nowrap shadow-sm relative z-10 uppercase tracking-wide cursor-pointer">
-            Cumplir
+          <button onclick="abrirModalFoto('${r.id}')" class="px-3.5 py-1.5 bg-white text-boda-primary border border-boda hover:bg-boda-primary hover:text-white active:scale-95 text-xs font-bold rounded-lg transition whitespace-nowrap shadow-sm relative z-10 uppercase tracking-wide cursor-pointer">
+            Subir
           </button>
         </div>
       `).join("");
@@ -341,14 +369,13 @@
 
     function actualizarEstadisticas() {
       const total = listaGlobalFotos.length;
-      document.getElementById("totalFotosCount").textContent = `${total} foto${total === 1 ? '' : 's'} subida${total === 1 ? '' : 's'}`;
+      document.getElementById("totalFotosCount").textContent = `${total} foto${total === 1 ? '' : 's'}`;
 
       if (total === 0) {
-        document.getElementById("topFotografo").textContent = "¡Sé el primero en subir!";
+        document.getElementById("topFotografo").textContent = "¡Sé el primero!";
         return;
       }
 
-      // Calcular quién ha subido más fotos
       const conteoAutores = {};
       listaGlobalFotos.forEach(f => {
         const autor = f.autor || "Anónimo";
@@ -379,14 +406,39 @@
         }).subscribe();
     }
 
-    window.abrirCamara = function(id) { 
-      retoSeleccionado = (id === 'null' || id === null) ? null : id; 
-      document.getElementById("cameraInput").click(); 
+    /* Funciones del Modal de Opciones (Cámara vs Galería) */
+    window.abrirModalFoto = function(id) {
+      retoSeleccionado = (id === 'null' || id === null) ? null : id;
+      const modal = document.getElementById("photoSourceModal");
+      const card = document.getElementById("photoSourceCard");
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+      setTimeout(() => card.classList.remove("translate-y-full"), 10);
     };
 
-    document.getElementById("cameraInput").addEventListener("change", async (e) => {
+    window.cerrarModalFoto = function() {
+      const modal = document.getElementById("photoSourceModal");
+      const card = document.getElementById("photoSourceCard");
+      card.classList.add("translate-y-full");
+      setTimeout(() => {
+        modal.classList.add("hidden");
+        modal.classList.remove("flex");
+      }, 300);
+    };
+
+    window.elegirFuente = function(fuente) {
+      cerrarModalFoto();
+      setTimeout(() => {
+        if (fuente === 'camera') document.getElementById('cameraInput').click();
+        if (fuente === 'gallery') document.getElementById('galleryInput').click();
+      }, 350);
+    };
+
+    /* Función unificada para procesar la foto subida de cualquier input */
+    window.procesarInputFoto = async function(e) {
       const originalFile = e.target.files[0];
       if (!originalFile) return;
+      e.target.value = ''; // Resetear el input
 
       mostrarToast("Procesando imagen...", 20);
 
@@ -433,7 +485,7 @@
         alert("Ocurrió un error inesperado al procesar la foto.");
         document.getElementById("toastSync").classList.add("hidden");
       }
-    });
+    };
 
     function mostrarToast(msg, w) {
       document.getElementById("toastSync").classList.remove("hidden");
@@ -461,7 +513,7 @@
       });
     }
 
-    /* Lógica del Modo Diapositiva (Slideshow) automático */
+    /* Lógica del Modo Diapositiva (Slideshow) */
     let modoProyector = false;
     function alternarProyeccion() {
       modoProyector = !modoProyector;
@@ -487,7 +539,6 @@
       if (listaGlobalFotos.length === 0) return;
       slideIndex = 0;
       mostrarSiguienteSlide();
-      // Cambia de foto cada 5 segundos automáticamente
       slideInterval = setInterval(mostrarSiguienteSlide, 5000);
     }
 
